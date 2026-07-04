@@ -1,14 +1,17 @@
-from emails import EmailSender
-from hrms import *
-from typing import List, Dict, Optional
-from mcp.server.fastmcp import FastMCP
-
-# load the env
 from dotenv import load_dotenv
 load_dotenv()
 
 import os
+import json
+from datetime import datetime
 from utils import seed_services
+from emails import EmailSender
+from hrms import *
+from hrms.auth_manager import AuthManager
+from typing import List, Dict, Optional
+from fastmcp import FastMCP
+from fastmcp.server.auth import require_scopes
+from token_verifier import HRTokenVerifier
 
 employee_manager = EmployeeManager()
 meeting_manager = MeetingManager()
@@ -25,9 +28,14 @@ emailer = EmailSender(
     use_tls=True
 )
 
-mcp = FastMCP("hr-assist")
+auth_manager = AuthManager()
 
-@mcp.tool()
+mcp = FastMCP(
+    "hr-assist",
+    auth=HRTokenVerifier(auth_manager)
+)
+
+@mcp.tool(auth=require_scopes("admin"))
 def add_employee(emp_name:str, manager_id:str, email:str) -> str:
     """
     Add a new employee to the HRMS system.
@@ -44,12 +52,12 @@ def add_employee(emp_name:str, manager_id:str, email:str) -> str:
     employee_manager.add_employee(emp)
     return f"Employee {emp_name} added successfully."
 
-@mcp.tool()
-def get_employee_details(name: str) -> Dict[str, str]:
+@mcp.tool(auth=require_scopes("employee"))
+def get_employee_details(name: str) -> str:
     """
     Get employee details by name.
     :param name: Name of the employee
-    :return: Employee ID and manager ID
+    :return: JSON string of Employee details
     """
     matches = employee_manager.search_employee_by_name(name)
 
@@ -58,15 +66,15 @@ def get_employee_details(name: str) -> Dict[str, str]:
 
     emp_id = matches[0]
     emp_details = employee_manager.get_employee_details(emp_id)
-    return emp_details
+    return json.dumps(emp_details)
 
-@mcp.tool()
-def send_email(to_emails: List[str], subject: str, body: str, html: bool = False) -> None:
+@mcp.tool(auth=require_scopes("admin"))
+def send_email(to_emails: List[str], subject: str, body: str, html: bool = False) -> str:
     emailer.send_email(subject, body, to_emails, from_email=emailer.username, html=html)
     return "Email sent successfully."
 
 
-@mcp.tool()
+@mcp.tool(auth=require_scopes("admin"))
 def create_ticket(emp_id: str, item: str, reason:str) -> str:
     """
     Create a ticket for buying required items for an employee.
@@ -78,7 +86,7 @@ def create_ticket(emp_id: str, item: str, reason:str) -> str:
     ticket_req = TicketCreate(emp_id=emp_id, item=item, reason=reason)
     return ticket_manager.create_ticket(ticket_req)
 
-@mcp.tool()
+@mcp.tool(auth=require_scopes("admin"))
 def update_ticket_status(ticket_id: str, status: str) -> str:
     """
     Update the status of a ticket.
@@ -89,18 +97,18 @@ def update_ticket_status(ticket_id: str, status: str) -> str:
     ticket_status_update = TicketStatusUpdate(status=status)
     return ticket_manager.update_ticket_status(ticket_status_update, ticket_id)
 
-@mcp.tool()
-def list_tickets(employee_id: str, status: str) -> str:
+@mcp.tool(auth=require_scopes("employee"))
+def list_tickets(employee_id: str, status: Optional[str] = None) -> str:
     """
     List tickets for an employee with optional status filter.
     :param employee_id: Employee ID
     :param status: Ticket status (optional)
-    :return: List of tickets
+    :return: JSON string List of tickets
     """
-    return ticket_manager.list_tickets(employee_id=employee_id, status=status)
+    return json.dumps(ticket_manager.list_tickets(employee_id=employee_id, status=status))
 
 
-@mcp.tool()
+@mcp.tool(auth=require_scopes("admin"))
 def schedule_meeting(employee_id: str, meeting_datetime: datetime, topic: str) -> str:
     """
     Schedule a meeting for an employee.
@@ -117,18 +125,18 @@ def schedule_meeting(employee_id: str, meeting_datetime: datetime, topic: str) -
     return meeting_manager.schedule_meeting(meeting_req)
 
 
-@mcp.tool()
+@mcp.tool(auth=require_scopes("employee"))
 def get_meetings(employee_id: str) -> str:
     """
     Get the list of meetings scheduled for an employee.
     :param employee_id: Employee ID
-    :return: List of meetings
+    :return: JSON string List of meetings
     """
-    return meeting_manager.get_meetings(employee_id)
+    return json.dumps(meeting_manager.get_meetings(employee_id))
 
 
-@mcp.tool()
-def cancel_meeting(employee_id: str, meeting_datetime: datetime, topic: str) -> str:
+@mcp.tool(auth=require_scopes("admin"))
+def cancel_meeting(employee_id: str, meeting_datetime: datetime, topic: Optional[str] = None) -> str:
     """
     Cancel a scheduled meeting for an employee.
     :param employee_id: Employee ID
@@ -144,7 +152,7 @@ def cancel_meeting(employee_id: str, meeting_datetime: datetime, topic: str) -> 
     return meeting_manager.cancel_meeting(meeting_req)
 
 
-@mcp.tool()
+@mcp.tool(auth=require_scopes("employee"))
 def get_employee_leave_balance(emp_id: str) -> str:
     """
     Get the leave balance of an employee.
@@ -153,7 +161,7 @@ def get_employee_leave_balance(emp_id: str) -> str:
     """
     return leave_manager.get_leave_balance(emp_id)
 
-@mcp.tool()
+@mcp.tool(auth=require_scopes("admin"))
 def apply_leave(emp_id: str, leave_dates: list) -> str:
     """
     Apply for leave for an employee.
@@ -165,17 +173,17 @@ def apply_leave(emp_id: str, leave_dates: list) -> str:
     return leave_manager.apply_leave(req)
 
 
-@mcp.tool()
+@mcp.tool(auth=require_scopes("employee"))
 def get_leave_history(emp_id: str) -> str:
     """
     Get the leave history of an employee.
     :param emp_id: Employee ID
-    :return: Leave history message
+    :return: JSON string Leave history
     """
-    return leave_manager.get_leave_history(emp_id)
+    return json.dumps(leave_manager.get_leave_history(emp_id))
 
 
-@mcp.prompt("onboard_new_employee")
+@mcp.prompt("onboard_new_employee", auth=require_scopes("admin"))
 def onboard_new_employee(employee_name: str, manager_name: str):
     return f"""Onboard a new employee with the following details:
     - Name: {employee_name}
@@ -188,7 +196,5 @@ def onboard_new_employee(employee_name: str, manager_name: str):
     - Schedule an introductory meeting between the employee and the manager.
     """
 
-
-
 if __name__ == "__main__":
-    mcp.run(transport="stdio")
+    mcp.run(transport="streamable-http", host="0.0.0.0", port=8080)
