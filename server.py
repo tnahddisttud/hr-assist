@@ -55,14 +55,17 @@ def add_employee(emp_name:str, manager_id:str, email:str) -> str:
 @mcp.tool(auth=require_scopes("employee"))
 def get_employee_details(name: str) -> str:
     """
-    Get employee details by name.
-    :param name: Name of the employee
+    Get employee details by name or employee ID.
+    :param name: Name or ID of the employee
     :return: JSON string of Employee details
     """
+    if name in employee_manager.employees:
+        return json.dumps(employee_manager.get_employee_details(name))
+
     matches = employee_manager.search_employee_by_name(name)
 
     if len(matches) == 0:
-        raise ValueError(f"No employees found with name {name}.")
+        raise ValueError(f"No employees found with name or ID {name}.")
 
     emp_id = matches[0]
     emp_details = employee_manager.get_employee_details(emp_id)
