@@ -21,19 +21,21 @@ Add the following configuration to your claude_desktop_config.json file:
             "C::\\code\\atliq-hr-assist",
             "run",
             "server.py"
-        ],
-        "env": {
-            "CB_EMAIL": "YOUR_EMAIL",
-            "CB_EMAIL_PWD": "YOUR_APP_PASSWORD"
-        }
+        ]
         }
     }
     }
     ```
 
-- Replace YOUR_EMAIL with your actual email.
-- Replace YOUR_APP_PASSWORD with your email provider’s app-specific password (e.g., for Gmail).
-- Run `uv init` and `uv add mcp[cli]` as per the video tutorial in the course.  
+- Run `uv init` and `uv add mcp[cli]` as per the video tutorial in the course.
+
+## Testing with MCP Inspector
+
+You can test the MCP server interactively without Claude Desktop using the MCP Inspector. Run the following command in your terminal:
+
+```bash
+npx @modelcontextprotocol/inspector uv run server.py
+```
 
 
 All rights reserver @Codebasics Inc and LearnerX India Private Ltd.

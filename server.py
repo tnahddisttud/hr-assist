@@ -1,13 +1,7 @@
-from emails import EmailSender
 from hrms import *
 from typing import List, Dict, Optional
 from mcp.server.fastmcp import FastMCP
 
-# load the env
-from dotenv import load_dotenv
-load_dotenv()
-
-import os
 from utils import seed_services
 
 employee_manager = EmployeeManager()
@@ -16,14 +10,6 @@ leave_manager = LeaveManager()
 ticket_manager = TicketManager()
 
 seed_services(employee_manager, leave_manager, meeting_manager, ticket_manager)
-
-emailer = EmailSender(
-    smtp_server="smtp.gmail.com",
-    port=587,
-    username=os.getenv("CB_EMAIL"),
-    password=os.getenv("CB_EMAIL_PWD"),
-    use_tls=True
-)
 
 mcp = FastMCP("hr-assist")
 
@@ -59,11 +45,6 @@ def get_employee_details(name: str) -> Dict[str, str]:
     emp_id = matches[0]
     emp_details = employee_manager.get_employee_details(emp_id)
     return emp_details
-
-@mcp.tool()
-def send_email(to_emails: List[str], subject: str, body: str, html: bool = False) -> None:
-    emailer.send_email(subject, body, to_emails, from_email=emailer.username, html=html)
-    return "Email sent successfully."
 
 
 @mcp.tool()
@@ -182,7 +163,6 @@ def onboard_new_employee(employee_name: str, manager_name: str):
     - Manager Name: {manager_name}
     Steps to follow:
     - Add the employee to the HRMS system.
-    - Send a welcome email to the employee with their login credentials. (Format: employee_name@atliq.com)
     - Notify the manager about the new employee's onboarding.
     - Raise tickets for a new laptop, id card, and other necessary equipment.
     - Schedule an introductory meeting between the employee and the manager.
